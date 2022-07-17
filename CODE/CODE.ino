@@ -4,15 +4,13 @@ volatile int tempThreshold = 0;
 volatile int mode = 1;
 volatile int humidThreshold = 0;
 volatile bool UPstate = 0,DOWNstate = 0;
+volatile long int tempLastupdate,humidLastupdate;
 // Include Wire Library for I2C
 #include <Wire.h>
  #include<avr/interrupt.h>
-// Include Adafruit Graphics & OLED libraries
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-int c=0;
- 
 // Reset pin not used but needed for library
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
@@ -26,6 +24,7 @@ ISR(INT0_vect)
         {
           mode=1;
         }
+        delay(10);
         
 
 }
@@ -33,8 +32,16 @@ ISR(PCINT2_vect)
 {
    if(bit_is_set(PIND,PD5) && !UPstate)
     { 
-        if(mode == 2)tempThreshold++;
-        if(mode == 3)humidThreshold++;
+        if(mode == 2)
+        {
+          tempThreshold++;
+          tempLastupdate = millis();
+        }
+        if(mode == 3)
+        {
+          humidThreshold++;
+          humidLastupdate = millis();
+        }
         UPstate = HIGH;
     }
     else if (!bit_is_set(PIND,PD5) && UPstate)
@@ -67,7 +74,8 @@ void external_intrrept_init()
 void setup() {
   // Start Wire library for I2C
   Wire.begin();
-Serial.begin(9600);   Serial.print("Humidity :");
+Serial.begin(9600);   
+Serial.print("Humidity :");
   Serial.println(humidThreshold);
   DDRB |= (1<<PB5); //pinMode(13,OUTPUT);
  DDRD |= (1<<PD0); //pinMode(0,OUTPUT);
@@ -93,7 +101,7 @@ void displayTempHumid(){
   display.print("DroneBot Workshop");
   display.setCursor(0,10); 
   display.print("Humidity:    "); 
-  display.print(c++);
+  display.print(9);
   display.print(" %");
   display.setCursor(0,20);
   display.print("Temperature: "); 
@@ -139,11 +147,15 @@ void loop() {
   display.display();
   if(mode == 3)
   {
+     humidLastupdate = millis();    
     setHumidity();
+    if(millis()-humidLastupdate>10000)mode=1;
   }
   if(mode == 2)
   {
+    tempLastupdate = millis();humidLastupdate = millis();  
     setTemprature();
+    if(millis()-tempLastupdate>10000)mode=1;
   }
   if(mode == 1)
   {
